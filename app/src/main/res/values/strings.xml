@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Countdown</string>
+    <string name="question1">Can I ask you some\npersonal question?</string>
+    <string name="question2">What\'s your name?</string>
+    <string name="question3">When would you wake up?</string>
+    <string name="question4">When would you go down?</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="ready">I\'m Ready</string>
+</resources>
