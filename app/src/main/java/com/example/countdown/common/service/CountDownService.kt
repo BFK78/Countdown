@@ -9,15 +9,20 @@ import android.os.IBinder
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import com.example.countdown.MainActivity
 import com.example.countdown.R
 import com.example.countdown.common.constants.Constants.CODE_ACHIEVE_INTENT
 import com.example.countdown.common.constants.Constants.CODE_FOREGROUND_SERVICE
 import com.example.countdown.common.constants.Constants.CODE_REPLY_INTENT
+import com.example.countdown.common.constants.Constants.FROM_SERVICE_INTENT_EXTRA
 import com.example.countdown.common.constants.Constants.INTENT_COMMAND
 import com.example.countdown.common.constants.Constants.INTENT_COMMAND_ACHIEVE
 import com.example.countdown.common.constants.Constants.INTENT_COMMAND_EXIT
 import com.example.countdown.common.constants.Constants.INTENT_COMMAND_REPLY
 import com.example.countdown.common.constants.Constants.NOTIFICATION_CHANNEL_GENERAL
+import com.example.countdown.common.constants.Constants.NOTIFICATION_CHANNEL_ID
+import com.example.countdown.common.constants.Constants.NOTIFICATION_CHANNEL_NAME
+import com.example.countdown.common.constants.Constants.SERVICE_INTENT_EXTRA
 import java.lang.Exception
 import java.util.*
 
@@ -28,6 +33,8 @@ class CountDownService: Service() {
         private const val TAG = "BroadcastService"
         const val COUNTDOWN_BR ="com.example.countdown"
     }
+
+    private val timer = Timer()
 
     val intent = Intent(COUNTDOWN_BR)
     private var countDownTimer: CountDownTimer? = null
@@ -47,103 +54,34 @@ class CountDownService: Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 
-//        val command = intent?.getStringExtra(INTENT_COMMAND)
-//
-//        if (command == INTENT_COMMAND_EXIT) {
-//            stopService()
-//            return START_NOT_STICKY
-//        }
-//
-//        showNotification()
-//
-//        if (command == INTENT_COMMAND_REPLY) {
-//            Toast.makeText(this, "Clicked in the notification", Toast.LENGTH_LONG).show()
-//        }
-
-        val currentTIme = intent?.getIntExtra("", 0)
-
-        val timer: Timer = Timer()
+        var currentTime = intent?.getIntExtra(SERVICE_INTENT_EXTRA, 0)
 
         timer.scheduleAtFixedRate( object : TimerTask() {
-
             override fun run() {
 
+                val intentLocal = Intent()
+                intentLocal.setAction("Counter")
+
+                currentTime = currentTime!! + 1
+
+//                notificationUpdate(currentTime!!)
+
+                intentLocal.putExtra(FROM_SERVICE_INTENT_EXTRA, currentTime)
+                sendBroadcast(intentLocal)
             }
 
-        }, 0, 1000)
+        }, 1000, 1000)
 
         return START_STICKY
     }
 
-    private fun stopService() {
-        stopForeground(true)
-        stopSelf()
-    }
+
 
     override fun onBind(p0: Intent?): IBinder? = null
 
-    private fun showNotification() {
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val replyIntent = Intent(this, CountDownService::class.java).apply {
-            putExtra(INTENT_COMMAND, INTENT_COMMAND_REPLY)
-        }
-        val achieveIntent = Intent(
-            this, CountDownService::class.java
-        ).apply {
-            putExtra(INTENT_COMMAND, INTENT_COMMAND_ACHIEVE)
-        }
-
-        val replyPendingIntent = PendingIntent.getService(
-            this, CODE_REPLY_INTENT, replyIntent, 0
-        )
-
-        val achievePendingIntent = PendingIntent.getService(
-            this, CODE_ACHIEVE_INTENT, achieveIntent, 0
-        )
-
-        try {
-            with(
-                NotificationChannel(
-                    NOTIFICATION_CHANNEL_GENERAL,
-                    "Count Down",
-                    NotificationManager.IMPORTANCE_DEFAULT
-                )
-            ) {
-                enableLights(true)
-                setShowBadge(true)
-                enableVibration(false)
-                setSound(null, null)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                manager.createNotificationChannel(this)
-            }
-        } catch (e: Exception) {
-            Log.i("basim notification error", "${e.localizedMessage} error")
-        }
-
-        with(
-            NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_GENERAL)
-        ) {
-            setTicker("basim")
-            setContentTitle("Countdown")
-            setContentText("Successfully using......")
-            setAutoCancel(false)
-            setOngoing(true)
-            setWhen(System.currentTimeMillis())
-            setSmallIcon(R.drawable.ic_baseline_play_arrow_24)
-            priority = Notification.PRIORITY_MAX
-            setContentIntent(replyPendingIntent)
-            addAction(
-                0, "REPLY", replyPendingIntent
-            )
-            addAction(
-                0, "ACHIEVE", achievePendingIntent
-            )
-            startForeground(CODE_FOREGROUND_SERVICE, build())
-        }
-    }
-
     override fun onDestroy() {
-        countDownTimer?.cancel()
+        Log.i("basu", "Destroyed called")
+        timer.cancel()
         super.onDestroy()
     }
 

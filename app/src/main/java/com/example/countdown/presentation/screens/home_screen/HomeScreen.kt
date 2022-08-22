@@ -45,6 +45,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavHostController
 import com.example.countdown.R
+import com.example.countdown.common.constants.Constants.FROM_SERVICE_INTENT_EXTRA
+import com.example.countdown.common.constants.Constants.SERVICE_INTENT_EXTRA
 import com.example.countdown.common.service.CountDownService
 import com.example.countdown.common.util.foregroundStartService
 import com.example.countdown.data.local.datastore.getEndTime
@@ -59,6 +61,7 @@ import kotlinx.coroutines.launch
 import java.lang.Exception
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.log
 
 @Composable
 fun HomeScreen(
@@ -337,7 +340,7 @@ fun QuoteBox(
 @Composable
 fun ButtonDesign(
     size: Dp = 200.dp,
-    x: Float
+    x: State<Float>
 ) {
 
     val radius = with(LocalDensity.current) {
@@ -349,7 +352,7 @@ fun ButtonDesign(
     ) {
         drawArc(
             color = Color(0XFF307CBE),
-            startAngle = 240f + x,
+            startAngle = 240f + x.value,
             sweepAngle = 90f,
             useCenter = false,
             size = Size(width = radius, height = radius),
@@ -358,7 +361,7 @@ fun ButtonDesign(
 
         drawArc(
             color = Color(0XFFE8C682),
-            startAngle = 120f + x,
+            startAngle = 120f + x.value,
             sweepAngle = 90f,
             useCenter = false,
             size = Size(width = radius, height = radius),
@@ -367,7 +370,7 @@ fun ButtonDesign(
 
         drawArc(
             color = Color(0XFFED5650),
-            startAngle = 360f + x,
+            startAngle = 360f + x.value,
             sweepAngle = 90f,
             useCenter = false,
             size = Size(width = radius, height = radius),
@@ -425,26 +428,57 @@ fun StartButton(
         mutableStateOf(Date())
     }
 
-    val x = animateFloatAsState(
+    val countChecker = remember {
+        mutableStateOf(0)
+    }
+
+    var x = animateFloatAsState(
         targetValue = if (isTimerRunning) 360f else 0f,
-        animationSpec = infiniteRepeatable(
+        animationSpec = if (isTimerRunning) infiniteRepeatable(
             animation = tween(2000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
-        )
+        ) else tween(500)
     )
 
-    val broadcastReceiver = object : BroadcastReceiver() {
-        override fun onReceive(p0: Context?, intent: Intent?) {
-            if (intent?.extras != null) {
-                val millis =intent.getLongExtra("countdown", 30000)
-                val dater = Date(millis)
-                val dates = SimpleDateFormat("HH : mm : ss").parse(time)
-                val dateo = addDate(dater, dates)
-                Log.i("datew", dateo.toString())
+
+
+
+    LaunchedEffect(key1 = true) {
+
+        val intentFilter = IntentFilter()
+        intentFilter.addAction("Counter")
+
+        val broadcastReceiver = object: BroadcastReceiver() {
+            override fun onReceive(p0: Context?, p1: Intent?) {
+                val counter = p1?.getIntExtra(FROM_SERVICE_INTENT_EXTRA, 0)
+                if (isTimerRunning && counter != countChecker.value) {
+                    time = incrementTime(mh, mt, sh, st, hh, ht)
+                    val a = time.split("")
+                    ht = a[1].toInt()
+                    hh = a[2].toInt()
+                    mt = a[6].toInt()
+                    mh = a[7].toInt()
+                    st = a[11].toInt()
+                    sh = a[12].toInt()
+
+
+                    if (st >= 1) {
+                        sh = "${a[11]}${a[12]}".toInt()
+                    }
+
+                    if (mt >= 1) {
+                        mh = "${a[6]}${a[7]}".toInt()
+                    }
+                    countChecker.value = counter!!
+                }
             }
+
         }
 
+
+        context.registerReceiver(broadcastReceiver, intentFilter)
     }
+
 
 
     val endDateDataStore = getEndTime(context = context).collectAsState(initial = Date().toString())
@@ -455,30 +489,6 @@ fun StartButton(
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    LaunchedEffect(key1 = sh, key2 = isTimerRunning) {
-
-        delay(1000)
-
-        if (isTimerRunning) {
-            time = incrementTime(mh, mt, sh, st, hh, ht)
-            val a = time.split("")
-            ht = a[1].toInt()
-            hh = a[2].toInt()
-            mt = a[6].toInt()
-            mh = a[7].toInt()
-            st = a[11].toInt()
-            sh = a[12].toInt()
-
-            if (st >= 1) {
-                sh = "${a[11]}${a[12]}".toInt()
-            }
-
-            if (mt >= 1) {
-                mh = "${a[6]}${a[7]}".toInt()
-            }
-
-        }
-    }
 
     DisposableEffect(key1 = lifecycleOwner) {
 
@@ -486,20 +496,6 @@ fun StartButton(
 
             if (event == Lifecycle.Event.ON_START) {
 
-            } else if (event == Lifecycle.Event.ON_STOP) {
-
-                try {
-                    context.unregisterReceiver(broadcastReceiver)
-                } catch (e: Exception) {
-
-                }
-
-            }else if (event == Lifecycle.Event.ON_RESUME) {
-                context.registerReceiver(broadcastReceiver, IntentFilter(CountDownService.COUNTDOWN_BR))
-            } else if (event == Lifecycle.Event.ON_PAUSE) {
-                context.unregisterReceiver(broadcastReceiver)
-            } else if (event == Lifecycle.Event.ON_DESTROY) {
-                context.stopService(Intent(context, CountDownService::class.java))
             }
         }
 
@@ -517,7 +513,7 @@ fun StartButton(
     ) {
 
         ButtonDesign(
-            x = x.value
+            x = x
         )
 
         Button(
@@ -526,7 +522,10 @@ fun StartButton(
                 calculateDifferenceBetweenTime(Date(), Date())
 
                 if (!isTimerRunning) {
-                    context.foregroundStartService("Start")
+                    val intent = Intent(context, CountDownService::class.java)
+                    intent.putExtra(SERVICE_INTENT_EXTRA, 0)
+                    context.startService(intent)
+
                     starTime = Calendar.getInstance().time
 
                     val dayModel = DayModel(
@@ -540,7 +539,10 @@ fun StartButton(
                     viewModel.insertDayTimer(dayModel = dayModel)
 
                 } else {
-                    context.foregroundStartService("Stop")
+
+                    val intent = Intent(context, CountDownService::class.java)
+                    context.stopService(intent)
+
                     date = SimpleDateFormat("HH : mm : ss").parse(time) as Date
                     endTime = Calendar.getInstance().time
 
@@ -599,9 +601,10 @@ fun QuoteDialog(
             isDialogOpen.value = false
         }) {
             Box(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
                     .clickable {
-                       isDialogOpen.value = false
+                        isDialogOpen.value = false
                     },
                 contentAlignment = Alignment.Center
             ) {

@@ -22,4 +22,11 @@ object Constants {
     const val CODE_REPLY_INTENT = 2
     const val CODE_ACHIEVE_INTENT = 3
 
+    const val SERVICE_INTENT_EXTRA = "contdown_time"
+    const val FROM_SERVICE_INTENT_EXTRA = "countdown_remaining"
+
+
+    const val NOTIFICATION_CHANNEL_ID = "Notification_channel_id"
+
+    const val NOTIFICATION_CHANNEL_NAME = "countdown_service"
 }
